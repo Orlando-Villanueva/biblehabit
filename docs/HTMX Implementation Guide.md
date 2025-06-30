@@ -14,6 +14,26 @@ HTMX follows a server-centric approach where:
 - **Minimal Client Logic**: Client handles only presentation and user interaction
 - **RESTful Design**: Embraces true REST principles with HATEOAS
 
+### HTMX-Native Philosophy
+
+Follow these principles to avoid over-engineering and maintain the HTMX way:
+
+#### ✅ **Prefer Built-in HTMX Features**
+- Use HTMX's declarative attributes over JavaScript event listeners
+- Leverage built-in error handling instead of manual DOM manipulation
+- Trust HTMX's response handling capabilities
+
+#### ❌ **Avoid JavaScript Complexity**
+- Don't use `addEventListener` for HTMX responses when attributes exist
+- Avoid manual JSON parsing when HTML responses work
+- Minimize custom JavaScript for HTMX operations
+- **✅ Applied in ReadingLogService**: Removed complex event dispatching, kept clean HTML responses
+
+#### 🎯 **Hypermedia-First Approach**
+- Return HTML fragments, not JSON when possible
+- Use appropriate HTTP status codes (422 for validation, etc.)
+- Let HTMX handle response routing with built-in attributes
+
 ```html
 <!-- Example: Reading log list that updates server-side -->
 <div id="reading-logs">
@@ -27,7 +47,106 @@ HTMX follows a server-centric approach where:
 
 ### Standard Response Patterns
 
-#### 1. Partial Content Updates
+#### 1. Content Loading Pattern (Recommended for Forms)
+
+**Use Case**: Loading forms and content sections within the main layout without full page reloads.
+
+**Pattern**: HTMX loads content into main content area, providing seamless navigation while maintaining URL accessibility.
+
+```html
+<!-- Dashboard with main content area -->
+<div id="main-content">
+    <!-- Dashboard content or loaded forms appear here -->
+    <div class="dashboard-overview">
+        <button hx-get="{{ route('logs.create') }}" 
+                hx-target="#main-content" 
+                hx-swap="innerHTML">
+            📖 Log Reading
+        </button>
+    </div>
+</div>
+```
+
+```php
+// Controller method supporting both HTMX and direct access
+public function create(Request $request)
+{
+    $books = $this->bibleReferenceService->listBibleBooks();
+    
+    // Return partial for HTMX requests
+    if ($request->header('HX-Request')) {
+        return view('partials.reading-log-form', compact('books'));
+    }
+    
+    // Return full page for direct access (graceful degradation)
+    return view('logs.create', compact('books'));
+}
+```
+
+**Benefits**:
+- ✅ **Seamless Navigation**: No page reloads, maintains app-like feel
+- ✅ **URL Accessibility**: Direct URLs still work for bookmarking
+- ✅ **Progressive Enhancement**: Graceful degradation if JavaScript disabled
+- ✅ **Consistent Layout**: Form appears within authenticated layout
+
+### URL Management with `hx-push-url`
+
+For navigation between different pages (not just content loading), use `hx-push-url="true"` to maintain proper browser history and URL state:
+
+```html
+<!-- Navigation buttons with URL management -->
+<button hx-get="{{ route('logs.index') }}" 
+        hx-target="#main-content" 
+        hx-swap="innerHTML"
+        hx-push-url="true">
+    View History
+</button>
+
+<button hx-get="{{ route('dashboard') }}" 
+        hx-target="#main-content" 
+        hx-swap="innerHTML"
+        hx-push-url="true">
+    Dashboard
+</button>
+```
+
+**How `hx-push-url` Works:**
+1. **HTMX makes request** to the URL specified in `hx-get` (e.g., `/logs`)
+2. **Server responds** with appropriate content (partial for HTMX, full page for direct access)
+3. **HTMX updates DOM** with the response content
+4. **HTMX updates browser URL** to match the request URL (e.g., `/logs`)
+5. **Browser history** gets a new entry, enabling back/forward navigation
+
+**Controller Pattern for URL Management:**
+```php
+public function index(Request $request)
+{
+    $logs = $this->getReadingLogs($request->user());
+    
+    // Return partial view for HTMX requests (navigation)
+    if ($request->header('HX-Request')) {
+        return view('partials.reading-log-page-content', compact('logs'));
+    }
+    
+    // Return full page for direct URL access (bookmarking, refresh)
+    return view('logs.index', compact('logs'));
+}
+```
+
+**When to Use `hx-push-url`:**
+- ✅ **Page Navigation**: Moving between distinct application pages
+- ✅ **Bookmarkable Content**: Users should be able to bookmark and share URLs
+- ❌ **Modal/Form Loading**: Temporary content that shouldn't change the URL
+- ❌ **Filter Updates**: Content updates within the same logical page
+
+**Benefits of URL Management:**
+- ✅ **Bookmarking**: Users can bookmark `/logs` and return directly
+- ✅ **Sharing**: URLs can be shared and accessed directly
+- ✅ **Browser Navigation**: Back/forward buttons work as expected
+- ✅ **Refresh Handling**: Page refresh loads the correct content
+- ✅ **SEO Friendly**: Proper URLs for different application states
+
+#### 2. Partial Content Updates
 ```php
 // Controller method returning HTML fragment
 public function getReadingLogs(Request $request)
@@ -70,6 +189,68 @@ public function getReadingLogs(Request $request)
 ```
 
 ## Error Handling Patterns
+
+### Modern HTMX Error Handling (Recommended)
+
+Use HTMX's built-in error handling attributes for clean, declarative error management:
+
+#### **Setup: Response-Targets Extension Required**
+
+The `response-targets` extension is **required** for `hx-target-error` to work properly:
+
+```html
+<!-- In layout head - Load extension after main HTMX -->
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/ext/response-targets.js"></script>
+```
+
+#### **Implementation: Form with Error Handling**
+
+```html
+<!-- Simple, HTMX-native error handling -->
+<form hx-post="{{ route('logs.store') }}" 
+      hx-target="#form-response" 
+      hx-swap="innerHTML"
+      hx-ext="response-targets"
+      hx-target-error="#form-response">
+    @csrf
+    
+    <div id="form-response">
+        <!-- Success and error responses appear here -->
+    </div>
+    
+    <!-- Form fields... -->
+</form>
+```
+
+**Key Configuration:**
+- `hx-ext="response-targets"` - Activates the extension for this form
+- `hx-target-error="#form-response"` - Where error responses (4xx/5xx) are displayed
+- `hx-target="#form-response"` - Where success responses (2xx) are displayed
+
+**Key Benefits:**
+- ✅ **No JavaScript required** - Pure HTMX declarative approach
+- ✅ **Automatic error routing** - 4xx/5xx responses go to `hx-target-error`
+- ✅ **Hypermedia-focused** - Returns HTML fragments, not JSON
+- ✅ **Simpler debugging** - No complex event listeners to trace
+
+#### **Common Issue: Extension Not Loaded**
+
+**Problem:** `hx-target-error` doesn't work, errors only appear in network tab
+**Cause:** Missing `response-targets` extension or `hx-ext` attribute
+**Solution:** Load extension and add `hx-ext="response-targets"` to form
+
+**Avoid Complex Approaches:**
+```html
+<!-- ❌ DON'T: Complex JavaScript event listeners -->
+<script>
+document.addEventListener('htmx:responseError', function(evt) {
+    // Manual DOM manipulation - not the HTMX way
+    const target = document.querySelector('#form-response');
+    target.innerHTML = evt.detail.xhr.response;
+});
+</script>
+```
 
 ### Laravel Validation Integration
 

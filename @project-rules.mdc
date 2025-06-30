@@ -1,0 +1,119 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Bible Reading Habit Builder - Project Rules
+
+## 🔄 PR Sub-Issue Completion Workflow
+
+### Mandatory Updates Rule
+When any PR sub-issue is completed, the following updates are **REQUIRED** before marking the task as done:
+
+#### 1. Linear Issue Update
+- **MUST** update the Linear issue status and description
+- **MUST** mark completed tasks with ✅ 
+- **MUST** preserve all original tasks and acceptance criteria
+- **MUST** add implementation details and progress notes
+
+#### 2. Development Roadmap Update
+- **MUST** update `docs/Bible Reading Habit Builder - Development Roadmap.md`
+- **MUST** mark completed items with ✅ 
+- **MUST** update progress indicators (IN PROGRESS, COMPLETED, etc.)
+- **MUST** maintain roadmap accuracy and current status
+
+#### 3. User Approval Requirement
+- **MUST** propose all changes to user BEFORE making updates
+- **MUST** get explicit user approval for both Linear and roadmap changes
+- **MUST** show user exactly what will be updated in both locations
+- **NEVER** make updates without user confirmation
+
+### Workflow Steps
+1. **Complete the technical implementation**
+2. **Propose Linear issue updates to user** (show exact changes)
+3. **Propose roadmap updates to user** (show exact changes)  
+4. **Wait for user approval** of both proposed changes
+5. **Make approved updates** to Linear and roadmap
+6. **Confirm completion** with user
+
+### Enforcement
+- **NO exceptions** - this workflow applies to ALL PR sub-issues
+- **Agent must follow** this process for every completed task
+- **User approval required** for every update, no matter how small
+- **Both documents must stay synchronized** with actual progress
+
+## 🚫 Development Server Constraint
+
+### Laravel Herd Environment
+- **NEVER** use `php artisan serve` command
+- **REASON**: Project runs on Laravel Herd which conflicts with artisan serve
+- **ALTERNATIVES**: Use Laravel Herd's built-in server, direct file testing, or artisan commands
+
+### Approved Testing Methods
+- `php artisan test` - Run test suite
+- `php artisan route:list` - Verify routes
+- `php artisan config:show` - Check configuration
+- Direct PHP script execution for service testing
+- Browser testing via Laravel Herd's server
+- Manual testing through existing routes
+
+### What NOT to Do
+- ❌ `php artisan serve`
+- ❌ Starting development servers
+- ❌ Port-based local servers
+
+### What TO Do Instead
+- ✅ Use Laravel Herd for local development
+- ✅ Test via artisan commands
+- ✅ Create temporary test scripts if needed
+- ✅ Verify functionality through existing routes
+
+## Development Environment
+
+### Laravel Herd Configuration
+- **NEVER use `php artisan serve`** - This project uses Laravel Herd for local development
+- **Laravel Herd provides native web server** - Sites are automatically served via nginx with .test domains
+- **Access via Herd interface** - Use Herd's GUI or check configured local domains
+- **Herd manages PHP versions** - No need to manually configure PHP server settings
+
+### Testing Alternatives
+When testing the system, use these methods instead of starting a development server:
+- **Run Laravel tests**: `php artisan test` or `vendor/bin/pest`
+- **Check routes**: `php artisan route:list`
+- **Inspect database**: `php artisan tinker` or database tools
+- **Validate configuration**: `php artisan config:show`
+- **Check migrations**: `php artisan migrate:status`
+- **Seed data for testing**: `php artisan db:seed`
+
+## Development Workflow
+
+### Local Testing
+- **Use Herd's configured domain** - Project should be accessible via local .test domain
+- **Leverage Herd Pro features** if available (dumps, logs, debugging)
+- **Database testing** - Use `php artisan migrate:fresh --seed` for clean test data
+- **Feature verification** - Test individual components via artisan commands and tests
+
+### Code Validation
+- **Run automated tests** before marking issues complete
+- **Check Laravel logs** via `storage/logs/laravel.log` or Herd's log viewer
+- **Validate HTMX functionality** through browser developer tools
+- **Test form submissions** and API endpoints through the configured Herd domain
+
+## Code Quality Rules
+
+### Import Standards
+- **NEVER use fully qualified class names in code** - always use proper import statements
+- **BAD**: `function (Illuminate\Http\Request $request)` or `new Illuminate\Support\Collection()`
+- **GOOD**: Add `use Illuminate\Http\Request;` at top, then use `function (Request $request)`
+- **Apply to all contexts**: Controllers, routes, services, models, tests, and any PHP files
+- **Rationale**: Improves readability, follows PSR standards, enables IDE autocompletion
+
+## Issue Completion Criteria
+- All features must be testable via the Herd-configured domain
+- Tests must pass: `php artisan test`
+- No critical errors in Laravel logs
+- HTMX functionality verified in browser
+- Database operations confirmed via tinker or migrations
+
+
+

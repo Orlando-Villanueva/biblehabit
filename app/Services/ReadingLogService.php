@@ -7,15 +7,36 @@ use App\Models\ReadingLog;
 use App\Models\BookProgress;
 use Illuminate\Support\Collection;
 use Carbon\Carbon;
+use InvalidArgumentException;
 
 class ReadingLogService
 {
+    private BibleReferenceService $bibleService;
+
+    public function __construct(BibleReferenceService $bibleService)
+    {
+        $this->bibleService = $bibleService;
+    }
+
     /**
-     * Log a new Bible reading entry for a user.
+     * Log a new Bible reading entry for a user (supports single chapter or chapter ranges).
      */
     public function logReading(User $user, array $data): ReadingLog
     {
-        // Create the reading log
+        // Validate and format the Bible reference
+        $this->validateBibleReference($data['book_id'], $data);
+        
+        // Format passage text if not provided
+        if (!isset($data['passage_text'])) {
+            $data['passage_text'] = $this->formatPassageText($data['book_id'], $data);
+        }
+
+        // Handle multiple chapters if provided
+        if (isset($data['chapters']) && is_array($data['chapters'])) {
+            return $this->logMultipleChapters($user, $data);
+        }
+
+        // Single chapter logging
         $readingLog = $user->readingLogs()->create([
             'book_id' => $data['book_id'],
             'chapter' => $data['chapter'],
@@ -27,7 +48,49 @@ class ReadingLogService
         // Update book progress
         $this->updateBookProgress($user, $data['book_id'], $data['chapter']);
 
+        // Server-side state updated - HTMX will handle UI updates
+
         return $readingLog;
+    }
+
+    /**
+     * Log multiple chapters as separate reading log entries.
+     */
+    private function logMultipleChapters(User $user, array $data): ReadingLog
+    {
+        $chapters = $data['chapters'];
+        $firstLog = null;
+        
+        foreach ($chapters as $chapter) {
+            $readingLog = $user->readingLogs()->create([
+                'book_id' => $data['book_id'],
+                'chapter' => $chapter,
+                'passage_text' => $data['passage_text'], // Range text like "John 1-3"
+                'date_read' => $data['date_read'] ?? now()->toDateString(),
+                'notes_text' => $data['notes_text'] ?? null,
+            ]);
+
+            // Update book progress for each chapter
+            $this->updateBookProgress($user, $data['book_id'], $chapter);
+            
+            // Return the first log for response consistency
+            if ($firstLog === null) {
+                $firstLog = $readingLog;
+            }
+        }
+
+        return $firstLog;
+    }
+
+    /**
+     * Get recent reading logs for a user (quick access method).
+     */
+    public function getRecentLogs(User $user, int $limit = 10): Collection
+    {
+        return $user->readingLogs()
+            ->recentFirst()
+            ->limit($limit)
+            ->get();
     }
 
     /**
@@ -67,7 +130,7 @@ class ReadingLogService
         $streak = 0;
         $currentDate = Carbon::today();
         
-        // Check if user has read today or yesterday (1-day grace period)
+        // Late Logging Grace: Check if user has read today or yesterday (1-day grace period for forgotten logs)
         $hasRecentReading = $readingDates->contains(fn($date) => 
             $date->isSameDay($currentDate) || $date->isSameDay($currentDate->subDay())
         );
@@ -135,24 +198,83 @@ class ReadingLogService
     }
 
     /**
+     * Validate Bible reference using BibleReferenceService.
+     */
+    private function validateBibleReference(int $bookId, array $data): void
+    {
+        if (!$this->bibleService->validateBookId($bookId)) {
+            throw new InvalidArgumentException("Invalid book ID: {$bookId}");
+        }
+
+        if (isset($data['chapter'])) {
+            if (!$this->bibleService->validateChapterNumber($bookId, $data['chapter'])) {
+                throw new InvalidArgumentException("Invalid chapter number for book ID: {$bookId}");
+            }
+        }
+
+        if (isset($data['chapters']) && is_array($data['chapters'])) {
+            foreach ($data['chapters'] as $chapter) {
+                if (!$this->bibleService->validateChapterNumber($bookId, $chapter)) {
+                    throw new InvalidArgumentException("Invalid chapter number {$chapter} for book ID: {$bookId}");
+                }
+            }
+        }
+    }
+
+    /**
+     * Format passage text using BibleReferenceService.
+     */
+    private function formatPassageText(int $bookId, array $data): string
+    {
+        if (isset($data['chapters']) && is_array($data['chapters'])) {
+            $startChapter = min($data['chapters']);
+            $endChapter = max($data['chapters']);
+            return $this->bibleService->formatBibleReferenceRange($bookId, $startChapter, $endChapter);
+        }
+
+        return $this->bibleService->formatBibleReference($bookId, $data['chapter']);
+    }
+
+    // Event handling removed - HTMX manages state updates via server responses
+
+    /**
      * Update book progress when a chapter is read.
      */
     private function updateBookProgress(User $user, int $bookId, int $chapter): void
     {
-        // This will be implemented with Bible configuration
-        // For now, we'll create a placeholder
+        // Get book information from BibleReferenceService
+        $book = $this->bibleService->getBibleBook($bookId);
+        if (!$book) {
+            throw new InvalidArgumentException("Invalid book ID: {$bookId}");
+        }
+
+        // Get the localized book name (string) instead of the array
+        $bookName = $this->bibleService->getLocalizedBookName($bookId);
+
         $bookProgress = $user->bookProgress()->firstOrCreate(
             ['book_id' => $bookId],
             [
-                'book_name' => "Book {$bookId}", // Will be replaced with actual book name
-                'total_chapters' => 50, // Will be replaced with actual chapter count
+                'book_name' => $bookName,
+                'total_chapters' => $book['chapters'],
                 'chapters_read' => [],
                 'completion_percent' => 0,
                 'is_completed' => false,
             ]
         );
 
-        $bookProgress->addChapter($chapter);
-        $bookProgress->save();
+        // Get current chapters read
+        $chaptersRead = $bookProgress->chapters_read ?? [];
+        
+        // Add new chapter if not already recorded
+        if (!in_array($chapter, $chaptersRead)) {
+            $chaptersRead[] = $chapter;
+            sort($chaptersRead); // Keep chapters sorted
+            
+            // Update book progress
+            $bookProgress->chapters_read = $chaptersRead;
+            $bookProgress->completion_percent = round((count($chaptersRead) / $book['chapters']) * 100, 2);
+            $bookProgress->is_completed = count($chaptersRead) >= $book['chapters'];
+            $bookProgress->save();
+        }
     }
 } 

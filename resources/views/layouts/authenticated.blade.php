@@ -12,7 +12,9 @@
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet" />
 
         <!-- HTMX CDN -->
-        <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1rYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/htmx.min.js"></script>
+        <!-- HTMX Response Targets Extension for Error Handling -->
+        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.5/dist/ext/response-targets.js"></script>
         
         <!-- Alpine.js CDN -->
         <script defer src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js"></script>
@@ -26,7 +28,10 @@
         </style>
     </head>
     <body class="bg-gray-50 text-gray-600 min-h-screen font-sans antialiased">
-        <div class="flex h-screen">
+        <div class="flex h-screen" x-data="{ 
+            currentView: '{{ request()->routeIs('logs.*') ? 'logs' : 'dashboard' }}',
+            previousView: 'dashboard'
+        }">
             <!-- Desktop Sidebar Navigation -->
             <aside class="hidden lg:flex lg:flex-col w-64 bg-white border-r border-gray-200">
                 <!-- Logo Section -->
@@ -38,29 +43,33 @@
 
                 <!-- Navigation Links -->
                 <nav class="flex-1 p-4 space-y-2">
-                    <a href="{{ route('dashboard') }}" 
-                       class="flex items-center px-4 py-3 text-sm font-medium rounded-lg min-h-[44px] {{ request()->routeIs('dashboard') ? 'nav-active' : 'text-gray-600 hover:bg-gray-100' }}">
+                    <button hx-get="{{ route('dashboard') }}" 
+                            hx-target="#page-container" 
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            @click="previousView = currentView; currentView = 'dashboard'"
+                            :class="currentView === 'dashboard' ? 'nav-active' : 'text-gray-600 hover:bg-gray-100'"
+                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg min-h-[44px] w-full text-left">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
                         </svg>
                         Dashboard
-                    </a>
+                    </button>
 
-                    <a href="{{ route('history') }}" 
-                       class="flex items-center px-4 py-3 text-sm font-medium rounded-lg min-h-[44px] {{ request()->routeIs('history') ? 'nav-active' : 'text-gray-600 hover:bg-gray-100' }}">
+                    <button hx-get="{{ route('logs.index') }}" 
+                            hx-target="#page-container" 
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            @click="previousView = currentView; currentView = 'logs'"
+                            :class="currentView === 'logs' ? 'nav-active' : 'text-gray-600 hover:bg-gray-100'"
+                            class="flex items-center px-4 py-3 text-sm font-medium rounded-lg min-h-[44px] w-full text-left">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v16a2 2 0 002 2z"></path>
                         </svg>
                         History
-                    </a>
+                    </button>
 
-                    <a href="{{ route('profile') }}" 
-                       class="flex items-center px-4 py-3 text-sm font-medium rounded-lg min-h-[44px] {{ request()->routeIs('profile*') ? 'nav-active' : 'text-gray-600 hover:bg-gray-100' }}">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                        </svg>
-                        Profile
-                    </a>
+
                 </nav>
 
                 <!-- User Info & Logout -->
@@ -138,70 +147,86 @@
                                 <div class="w-px h-6 bg-gray-300"></div>
                             </div>
                             
-                            <!-- Log Reading Button -->
-                            <a href="{{ route('logs.create') }}" 
-                               class="btn btn-primary min-h-[44px]">
+                            <!-- Log Reading Button (HTMX Content Loading) -->
+                            <button hx-get="{{ route('logs.create') }}" 
+                                    hx-target="#main-content" 
+                                    hx-swap="innerHTML"
+                                    @click="previousView = currentView"
+                                    class="btn btn-primary min-h-[44px]">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                                 </svg>
                                 <span>Log Reading</span>
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </header>
 
                 <!-- Page Content -->
                 <main class="flex-1 overflow-y-auto">
-                    <div class="lg:flex lg:h-full">
-                        <!-- Main Content (70% on desktop) -->
-                        <div class="lg:flex-1 lg:max-w-[70%] p-4 lg:p-6">
-                            @yield('content')
-                        </div>
+                    <div id="page-container" class="lg:flex lg:h-full">
+                        @hasSection('sidebar')
+                            <!-- Main Content (70% on desktop when sidebar present) -->
+                            <div class="lg:flex-1 lg:max-w-[70%] p-4 lg:p-6">
+                                @yield('content')
+                            </div>
 
-                        <!-- Sidebar Content (30% on desktop) -->
-                        <div class="hidden lg:block lg:w-[30%] lg:min-w-[300px] bg-white border-l border-gray-200 p-6">
-                            @yield('sidebar')
-                        </div>
+                            <!-- Sidebar Content (30% on desktop) -->
+                            <div class="hidden lg:block lg:w-[30%] lg:min-w-[300px] bg-white border-l border-gray-200 p-6">
+                                @yield('sidebar')
+                            </div>
+                        @else
+                            <!-- Full-width Content when no sidebar is defined -->
+                            <div class="flex-1 p-4 lg:p-6">
+                                @yield('content')
+                            </div>
+                        @endif
                     </div>
                 </main>
             </div>
+            <!-- Mobile Bottom Navigation -->
+            <nav class="mobile-nav md:hidden fixed bottom-0 left-0 right-0 px-4 py-2 z-40 h-20">
+                <div class="flex justify-around">
+                    <button hx-get="{{ route('dashboard') }}" 
+                            hx-target="#page-container" 
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            @click="previousView = currentView; currentView = 'dashboard'"
+                            :class="currentView === 'dashboard' ? 'text-blue-600' : 'text-gray-500'"
+                            class="flex flex-col items-center py-2 px-3 min-w-[44px] min-h-[44px] justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">Dashboard</span>
+                    </button>
+
+                    <button hx-get="{{ route('logs.index') }}" 
+                            hx-target="#page-container" 
+                            hx-swap="innerHTML"
+                            hx-push-url="true"
+                            @click="previousView = currentView; currentView = 'logs'"
+                            :class="currentView === 'logs' ? 'text-blue-600' : 'text-gray-500'"
+                            class="flex flex-col items-center py-2 px-3 min-w-[44px] min-h-[44px] justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v16a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">History</span>
+                    </button>
+
+
+                </div>
+            </nav>
+
+            <!-- Floating Action Button - Mobile Only -->
+            <button hx-get="{{ route('logs.create') }}" 
+                    hx-target="#main-content" 
+                    hx-swap="innerHTML"
+                    @click="previousView = currentView"
+                    class="lg:hidden fixed bottom-22 right-4 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center z-50">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </button>
         </div>
-
-        <!-- Mobile Bottom Navigation -->
-        <nav class="mobile-nav lg:hidden fixed bottom-0 left-0 right-0 px-4 py-2 z-40">
-            <div class="flex justify-around">
-                <a href="{{ route('dashboard') }}" 
-                   class="flex flex-col items-center py-2 px-3 min-w-[44px] min-h-[44px] justify-center {{ request()->routeIs('dashboard') ? 'text-blue-600' : 'text-gray-500' }}">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
-                    </svg>
-                    <span class="text-xs mt-1">Dashboard</span>
-                </a>
-
-                <a href="{{ route('history') }}" 
-                   class="flex flex-col items-center py-2 px-3 min-w-[44px] min-h-[44px] justify-center {{ request()->routeIs('history') ? 'text-blue-600' : 'text-gray-500' }}">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v16a2 2 0 002 2z"></path>
-                    </svg>
-                    <span class="text-xs mt-1">History</span>
-                </a>
-
-                <a href="{{ route('profile') }}" 
-                   class="flex flex-col items-center py-2 px-3 min-w-[44px] min-h-[44px] justify-center {{ request()->routeIs('profile*') ? 'text-blue-600' : 'text-gray-500' }}">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    <span class="text-xs mt-1">Profile</span>
-                </a>
-            </div>
-        </nav>
-
-        <!-- Floating Action Button - Mobile Only -->
-        <a href="{{ route('logs.create') }}" 
-           class="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center z-50">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-            </svg>
-        </a>
     </body>
 </html> 
