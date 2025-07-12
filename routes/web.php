@@ -3,9 +3,30 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use App\Http\Controllers\ReadingLogController;
+use App\Services\BookProgressService;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+// Debug route to test BibleReferenceService (outside auth middleware)
+Route::get('/debug-books', function () {
+    try {
+        $bibleService = app(\App\Services\BibleReferenceService::class);
+        $books = $bibleService->listBibleBooks();
+        return response()->json([
+            'success' => true,
+            'books_count' => count($books),
+            'first_book' => $books[0] ?? null,
+            'sample' => array_slice($books, 0, 3)
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+    }
 });
 
 // Authentication Routes (GET routes for views - POST routes handled by Fortify)
@@ -27,18 +48,16 @@ Route::middleware('guest')->group(function () {
     })->name('password.reset');
 });
 
-
-
 // Authenticated Routes
 Route::middleware('auth')->group(function () {
     // Main Dashboard
     Route::get('/dashboard', function (Request $request) {
-        // Return page container for HTMX navigation requests
+        // Return partial for HTMX navigation, full page for direct access
         if ($request->header('HX-Request')) {
             return view('partials.dashboard-page');
         }
         
-        // Return full page for direct access (graceful degradation)
+        // Return full page for direct access (browser URL)
         return view('dashboard');
     })->name('dashboard');
 
@@ -53,4 +72,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/logs', [ReadingLogController::class, 'index'])->name('logs.index');
     Route::get('/logs/create', [ReadingLogController::class, 'create'])->name('logs.create');
     Route::post('/logs', [ReadingLogController::class, 'store'])->name('logs.store');
+    
+    // User Preferences
+    Route::post('/preferences/testament', function (Request $request) {
+        $testament = $request->input('testament');
+        
+        // Validate the testament value
+        if (!in_array($testament, ['Old', 'New'])) {
+            return response('Invalid testament', 400);
+        }
+        
+        // Store in session
+        session(['testament_preference' => $testament]);
+        
+        // Return 200 OK for HTMX (no content needed since hx-swap="none")
+        return response('', 200);
+    })->name('preferences.testament');
 });
